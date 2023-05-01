@@ -146,14 +146,12 @@ model = dict(
         ),
     ),
     pts_bbox_head=dict(
-        type='Mask2FormerHead',
+        type='Mask2FormerNusOccHead',
         feat_channels=mask2former_feat_channel,
         out_channels=mask2former_output_channel,
         num_queries=mask2former_num_queries,
-        num_things_classes=num_class,
-        num_stuff_classes=0,
+        num_occupancy_classes=num_class,
         pooling_attn_mask=True,
-        sample_weight_gamma=0.25,
         # using stand-alone pixel decoder
         positional_encoding=dict(
             type='SinePositionalEncoding3D',
@@ -189,6 +187,36 @@ model = dict(
                                  'ffn', 'norm')
             ),
             init_cfg=None
+        ),
+        loss_cls=dict(
+            type='CrossEntropyLoss',
+            use_sigmoid=False,
+            loss_weight=2.0,
+            reduction='mean',
+            class_weight=[1.0] * num_class + [0.1]
+        ),
+        point_cloud_range=point_cloud_range,
+    ),
+    train_cfg=dict(
+        pts=dict(
+            num_points=12544 * 4,
+            oversample_ratio=3.0,
+            importance_sample_ratio=0.75,
+            assigner=dict(
+                type='MaskHungarianAssigner',
+                cls_cost=dict(type='ClassificationCost', weight=2.0),
+                mask_cost=dict(
+                    type='CrossEntropyLossCost', weight=5.0, use_sigmoid=True),
+                dice_cost=dict(
+                    type='DiceCost', weight=5.0, pred_act=True, eps=1.0)),
+            sampler=dict(type='MaskPseudoSampler')
+        )
+    ),
+    test_cfg=dict(
+        pts=dict(
+            semantic_on=True,
+            panoptic_on=False,
+            instance_on=False
         )
     )
 )
